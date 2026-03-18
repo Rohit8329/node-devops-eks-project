@@ -1,65 +1,64 @@
-name: CI/CD to EKS
+name: Deploy to EKS
 
 on:
   push:
     branches:
       - main
 
-env:
-  IMAGE_NAME: rohit151/node-devops-app  # Docker Hub username/repo
-
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
     steps:
-      # 1️⃣ Checkout repo
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ Setup Node.js
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      # 3️⃣ Install dependencies
-      - name: Install NPM packages
-        run: |
-          cd app
-          npm install
-
-      # 4️⃣ Login to Docker Hub
-      - name: Docker Login
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # 5️⃣ Build & Push Docker image
-      - name: Build and Push Docker Image
-        run: |
-          IMAGE_TAG=${IMAGE_NAME}:${GITHUB_SHA}
-          docker build -t $IMAGE_TAG ./app
-          docker push $IMAGE_TAG
-          docker tag $IMAGE_TAG ${IMAGE_NAME}:latest
-          docker push ${IMAGE_NAME}:latest
-        env:
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-
-      # 6️⃣ Configure AWS CLI
-      - name: Configure AWS
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 7️⃣ Deploy to EKS
-      - name: Deploy to EKS
+      - name: Set up kubectl and eksctl
         uses: aws-actions/eks-kubectl@v2
         with:
           cluster-name: ${{ secrets.EKS_CLUSTER_NAME }}
           region: ${{ secrets.AWS_REGION }}
-          manifests: ./kubernetes
-          args: set image deployment/node-devops-app node-app=${{ env.IMAGE_NAME }}:${GITHUB_SHA}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG=${{ secrets.DOCKER_USERNAME }}/node-devops-app:${GITHUB_SHA}
+          docker build -t $IMAGE_TAG ./app
+          docker push $IMAGE_TAG
+          docker tag $IMAGE_TAG ${{ secrets.DOCKER_USERNAME }}/node-devops-app:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/node-devops-app:latest
+
+      - name: Update Kubernetes deployment
+        run: |
+          kubectl set image deployment/node-devops-app node-app=${{ secrets.DOCKER_USERNAME }}/node-devops-app:latest
+          kubectl rollout status deployment/node-devops-app
+
+      # ✅ Optional: Wait for LoadBalancer and print URL
+      - name: Wait for LoadBalancer
+        run: |
+          echo "Waiting for LoadBalancer to get external IP..."
+          for i in {1..30}; do
+            LB=$(kubectl get svc node-devops-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ ! -z "$LB" ]; then
+              echo "LoadBalancer ready: http://$LB"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 10
+          done
