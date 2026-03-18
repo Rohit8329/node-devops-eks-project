@@ -1,2 +1,13 @@
-npm init -y
-npm install express
+{
+  "name": "node-devops-app",
+  "version": "1.0.0",
+  "description": "Simple Node.js app for DevOps pipeline",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
