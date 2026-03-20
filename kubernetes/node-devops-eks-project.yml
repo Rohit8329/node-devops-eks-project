@@ -1,0 +1,25 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: node-devops-cluster
+  region: us-east-1
+  version: "1.34"
+
+# Remove custom VPC entirely
+# eksctl will create VPC, subnets, IGW automatically
+
+nodeGroups:
+  - name: standard-workers
+    instanceType: t3.medium
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    volumeSize: 20
+    amiFamily: AmazonLinux2023
+    ssh:
+      allow: true
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["api", "audit", "authenticator", "controllerManager", "scheduler"]
