@@ -1,0 +1,32 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: node-devops-cluster
+  region: us-east-1
+  version: "1.34"
+
+vpc:
+  cidr: "192.168.0.0/16"
+  subnets:
+    public:
+      us-east-1a: { cidr: "192.168.0.0/19" }
+      us-east-1b: { cidr: "192.168.32.0/19" }
+    private:
+      us-east-1a: { cidr: "192.168.64.0/19" }
+      us-east-1b: { cidr: "192.168.96.0/19" }
+
+nodeGroups:
+  - name: standard-workers
+    instanceType: t3.medium
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    volumeSize: 20
+    amiFamily: AmazonLinux2023
+    ssh:
+      allow: true
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["api", "audit", "authenticator", "controllerManager", "scheduler"]
